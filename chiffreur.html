@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chiffreur de fichiers — AES-256 / RSA-4096 (hors-ligne)</title>
+<style>
+  :root { --bg:#0f1419; --card:#1a222c; --acc:#4fc3f7; --txt:#e6edf3; --mut:#8b97a3; --ok:#3fb950; --err:#f85149; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--txt); line-height:1.5; }
+  .wrap { max-width:760px; margin:0 auto; padding:24px 16px 64px; }
+  h1 { font-size:1.5rem; margin:0 0 4px; }
+  .sub { color:var(--mut); font-size:.9rem; margin-bottom:20px; }
+  .tabs { display:flex; gap:8px; margin-bottom:16px; }
+  .tab { flex:1; padding:10px; text-align:center; background:var(--card); border:1px solid #2b3744; border-radius:8px; cursor:pointer; color:var(--mut); }
+  .tab.active { color:var(--txt); border-color:var(--acc); }
+  .card { background:var(--card); border:1px solid #2b3744; border-radius:10px; padding:18px; margin-bottom:16px; }
+  .card h2 { font-size:1rem; margin:0 0 12px; color:var(--acc); }
+  .drop { border:2px dashed #3a4855; border-radius:10px; padding:26px; text-align:center; color:var(--mut); cursor:pointer; transition:.15s; }
+  .drop.over { border-color:var(--acc); background:#10212b; color:var(--txt); }
+  .drop.has { border-style:solid; border-color:var(--ok); color:var(--txt); }
+  label { display:block; font-size:.85rem; color:var(--mut); margin:12px 0 4px; }
+  input[type=password], input[type=text] { width:100%; padding:10px; background:#0d1117; border:1px solid #2b3744; border-radius:8px; color:var(--txt); font-size:.95rem; }
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  .row > * { flex:1; min-width:160px; }
+  button { width:100%; padding:11px; border:0; border-radius:8px; background:var(--acc); color:#06202b; font-weight:600; cursor:pointer; font-size:.95rem; margin-top:14px; }
+  button.ghost { background:#243240; color:var(--txt); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .msg { margin-top:12px; padding:10px 12px; border-radius:8px; font-size:.88rem; display:none; }
+  .msg.ok { display:block; background:#0f2a18; color:var(--ok); border:1px solid #1f6b34; }
+  .msg.err { display:block; background:#2a1213; color:var(--err); border:1px solid #6b1f23; }
+  .hidden { display:none; }
+  .hint { font-size:.8rem; color:var(--mut); margin-top:6px; }
+  a.dl { color:var(--acc); }
+  details { margin-top:10px; font-size:.85rem; color:var(--mut); }
+  summary { cursor:pointer; color:var(--acc); }
+  code { background:#0d1117; padding:1px 5px; border-radius:4px; }
+  .bar { height:6px; background:#0d1117; border-radius:4px; margin-top:8px; overflow:hidden; }
+  .bar > i { display:block; height:100%; width:0; background:var(--acc); transition:width .1s linear; }
+  .notice { background:#2a2410; border:1px solid #6b5a1f; border-radius:10px; padding:12px 14px; margin-bottom:16px; font-size:.85rem; color:#e8d9a0; }
+  .notice b { color:#ffd866; }
+  .chk { display:flex; gap:8px; align-items:center; font-size:.85rem; color:var(--txt); margin-top:12px; cursor:pointer; }
+  .chk input { width:auto; margin:0; cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔐 Chiffreur de fichiers</h1>
+  <div class="sub">AES-256-GCM · RSA-4096 · 100 % hors-ligne, dans ton navigateur. Aucun fichier n'est envoyé sur internet.</div>
+
+  <div class="notice">
+    ⚠️ <b>Le chiffrement crée une copie <code>.enc</code> téléchargée</b> (dossier <i>Téléchargements</i>).
+    Un navigateur ne peut pas toucher tes fichiers : <b>l'original reste en clair, à sa place, non modifié</b>.
+    Pour vraiment sécuriser un fichier, <b>supprime l'original toi-même</b> après avoir vérifié le <code>.enc</code>
+    (et vide la corbeille ; idéalement effacement sécurisé type <code>cipher /w</code>).
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="pwd">🔑 Mot de passe</div>
+    <div class="tab" data-tab="rsa">🗝️ Clés RSA</div>
+  </div>
+
+  <div id="pwd" class="tabpane">
+    <div class="card">
+      <h2>Chiffrer / Déchiffrer avec un mot de passe</h2>
+      <div id="pwdDrop" class="drop">Glisse un ou plusieurs fichiers (ou un dossier) ici, ou clique pour choisir</div>
+      <input type="file" id="pwdFile" class="hidden" multiple>
+      <label>Mot de passe (≥ 16 caractères recommandé : maj/min/chiffres/symboles)</label>
+      <input type="password" id="pwdPass" placeholder="mot de passe">
+      <label class="chk"><input type="checkbox" id="pwdHideName"> Masquer le nom du fichier (le <code>.enc</code> ne révèle plus le nom d'origine)</label>
+      <div class="row">
+        <button id="pwdEnc">Chiffrer</button>
+        <button id="pwdDec" class="ghost">Déchiffrer</button>
+      </div>
+      <div id="pwdMsg" class="msg"></div>
+      <div class="hint">Clé AES-256 dérivée du mot de passe (PBKDF2, 310 000 itérations). Même mot de passe pour déchiffrer. Multi-fichiers / dossier acceptés (un .enc par fichier).</div>
+    </div>
+  </div>
+
+  <div id="rsa" class="tabpane hidden">
+    <div class="card">
+      <h2>1. Générer une paire de clés RSA-4096</h2>
+      <label>Passphrase qui protège la clé privée</label>
+      <input type="password" id="genPass" placeholder="passphrase de la clé privée">
+      <button id="genBtn">Générer la paire de clés</button>
+      <div id="genMsg" class="msg"></div>
+      <div class="hint">Télécharge 2 fichiers : <code>cle_publique.bin</code> (sert à chiffrer, diffusable) et <code>cle_privee.bin</code> (sert à déchiffrer, à garder secret hors du poste).</div>
+    </div>
+
+    <div class="card">
+      <h2>2. Chiffrer (avec la clé publique)</h2>
+      <div id="rsaEncDrop" class="drop">Glisse un ou plusieurs fichiers (ou un dossier) à chiffrer</div>
+      <input type="file" id="rsaEncFile" class="hidden" multiple>
+      <label>Fichier clé publique (.bin)</label>
+      <input type="file" id="pubKeyFile">
+      <label class="chk"><input type="checkbox" id="rsaHideName"> Masquer le nom du fichier (le <code>.enc</code> ne révèle plus le nom d'origine)</label>
+      <button id="rsaEncBtn">Chiffrer</button>
+      <div id="rsaEncMsg" class="msg"></div>
+    </div>
+
+    <div class="card">
+      <h2>3. Déchiffrer (avec la clé privée + passphrase)</h2>
+      <div id="rsaDecDrop" class="drop">Glisse un ou plusieurs fichiers .enc</div>
+      <input type="file" id="rsaDecFile" class="hidden" multiple>
+      <label>Fichier clé privée (.bin)</label>
+      <input type="file" id="privKeyFile">
+      <label>Passphrase de la clé privée</label>
+      <input type="password" id="rsaDecPass" placeholder="passphrase">
+      <button id="rsaDecBtn">Déchiffrer</button>
+      <div id="rsaDecMsg" class="msg"></div>
+    </div>
+  </div>
+
+  <details>
+    <summary>Comment ça marche / sécurité</summary>
+    <p><b>AES-256-GCM</b> : chiffrement authentifié — chiffre et détecte toute altération.
+    <b>PBKDF2</b> (mode mot de passe) : 310 000 itérations pour ralentir le bruteforce.
+    <b>RSA-4096-OAEP</b> (mode clés) : emballe une clé de session AES aléatoire ;
+    seule la clé privée peut déchiffrer. Tout s'exécute localement via l'API
+    WebCrypto du navigateur. <b>Perdre le mot de passe / la clé privée = données
+    irrécupérables</b> (par conception).</p>
+    <p><b>Gros fichiers & multi-fichiers</b> : le contenu est chiffré par <b>blocs
+    de 16 Mio</b> (lus un par un, pas tout en RAM) avec une barre de progression.
+    Chaque bloc porte un IV unique et son rang authentifié (AAD) → un bloc retiré,
+    réordonné ou tronqué est détecté. Tu peux déposer <b>plusieurs fichiers ou un
+    dossier entier</b> : chacun produit son propre <code>.enc</code> (le nom/chemin
+    d'origine est restauré au déchiffrement). Les anciens fichiers restent lisibles.</p>
+  </details>
+</div>
+
+<script>
+const MAGIC = new TextEncoder().encode('WEBENC1');
+const VER1 = 1, VER2 = 2, VER3 = 3;
+const PBKDF2_ITER = 310000;
+const MODE_PWD = 1, MODE_RSA = 2;
+const CHUNK = 16 * 1024 * 1024;
+const TAG = 16;
+
+const te = new TextEncoder(), td = new TextDecoder();
+
+function concat(...arrs){
+  let len = arrs.reduce((s,a)=>s+a.byteLength,0), out = new Uint8Array(len), o=0;
+  for(const a of arrs){ out.set(new Uint8Array(a), o); o += a.byteLength; }
+  return out;
+}
+const u16 = n => new Uint8Array([n & 0xff, (n>>8) & 0xff]);
+const readU16 = (a,o) => a[o] | (a[o+1] << 8);
+const u32 = n => new Uint8Array([n & 0xff, (n>>8) & 0xff, (n>>16) & 0xff, (n>>>24) & 0xff]);
+const readU32 = (a,o) => (a[o] | (a[o+1]<<8) | (a[o+2]<<16) | (a[o+3]<<24)) >>> 0;
+const base = s => s.split(/[\\/]/).pop();
+
+async function deriveAesKey(password, salt, usages){
+  const baseKey = await crypto.subtle.importKey('raw', te.encode(password), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name:'PBKDF2', salt, iterations:PBKDF2_ITER, hash:'SHA-256' },
+    baseKey, { name:'AES-GCM', length:256 }, false, usages);
+}
+
+async function encryptChunked(file, key, header, onProgress){
+  const ivPrefix = crypto.getRandomValues(new Uint8Array(8));
+  const parts = [ header, ivPrefix, u32(CHUNK) ];
+  const size = file.size;
+  const nChunks = Math.max(1, Math.ceil(size / CHUNK));
+  for(let i=0;i<nChunks;i++){
+    const start = i*CHUNK, end = Math.min(start+CHUNK, size);
+    const plain = new Uint8Array(await file.slice(start, end).arrayBuffer());
+    const isLast = i === nChunks-1;
+    const iv  = concat(ivPrefix, u32(i));
+    const aad = concat(u32(i), new Uint8Array([isLast ? 1 : 0]));
+    const ct  = new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM', iv, additionalData:aad}, key, plain));
+    parts.push(u32(ct.length), ct);
+    if(onProgress) onProgress(size ? end/size : 1);
+  }
+  return new Blob(parts);
+}
+
+async function decryptChunkedV2(a, off, key, end, onProgress){
+  const ivPrefix = a.slice(off, off+8); off += 8;
+  off += 4;
+  const parts = [];
+  for(let i=0; off < end; i++){
+    if(off+4 > end) throw new Error('Fichier corrompu (en-tête de bloc tronqué).');
+    const ctLen = readU32(a, off); off += 4;
+    if(ctLen < TAG || off+ctLen > end) throw new Error('Fichier corrompu (longueur de bloc invalide).');
+    const ct = a.slice(off, off+ctLen); off += ctLen;
+    const isLast = off === end;
+    const iv  = concat(ivPrefix, u32(i));
+    const aad = concat(u32(i), new Uint8Array([isLast ? 1 : 0]));
+    let plain;
+    try { plain = new Uint8Array(await crypto.subtle.decrypt({name:'AES-GCM', iv, additionalData:aad}, key, ct)); }
+    catch { throw new Error(isLast
+      ? 'Échec d’intégrité : clé/mot de passe incorrect, ou fichier tronqué/altéré.'
+      : 'Bloc altéré, réordonné ou tronqué (échec d’intégrité).'); }
+    parts.push(plain);
+    if(onProgress) onProgress(off/end);
+  }
+  return new Blob(parts);
+}
+
+async function oneShotDecrypt(key, iv, ct, errMsg){
+  try { return new Blob([await crypto.subtle.decrypt({name:'AES-GCM', iv}, key, ct)]); }
+  catch { throw new Error(errMsg); }
+}
+
+async function encNameBlock(key, rel){
+  const nameIv = crypto.getRandomValues(new Uint8Array(12));
+  const enc = new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM', iv:nameIv}, key, te.encode(rel)));
+  return concat(nameIv, u32(enc.length), enc);
+}
+async function readEncName(a, off, key){
+  const nameIv = a.slice(off, off+12); off += 12;
+  const len = readU32(a, off); off += 4;
+  const enc = a.slice(off, off+len); off += len;
+  let name;
+  try { name = td.decode(await crypto.subtle.decrypt({name:'AES-GCM', iv:nameIv}, key, enc)); }
+  catch { throw new Error('Mot de passe / clé incorrect, ou en-tête altéré.'); }
+  return { rel:name, off };
+}
+
+function parseHead(a){
+  for(let i=0;i<MAGIC.length;i++) if(a[i]!==MAGIC[i]) throw new Error("Format invalide : ce fichier n'a pas été produit par cet outil.");
+  let off = MAGIC.length;
+  const ver = a[off++], mode = a[off++];
+  if(ver===VER1 || ver===VER2){
+    const nameLen = readU16(a, off); off += 2;
+    const rel = td.decode(a.slice(off, off+nameLen)); off += nameLen;
+    return { off, ver, mode, rel };
+  }
+  return { off, ver, mode, rel:null };
+}
+
+async function pwdEncryptFile(file, rel, password, onP, hideName){
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key  = await deriveAesKey(password, salt, ['encrypt']);
+  let header;
+  if(hideName){
+    header = concat(MAGIC, new Uint8Array([VER3, MODE_PWD]), salt, await encNameBlock(key, rel));
+  } else {
+    const name = te.encode(rel);
+    header = concat(MAGIC, new Uint8Array([VER2, MODE_PWD]), u16(name.length), name, salt);
+  }
+  return encryptChunked(file, key, header, onP);
+}
+async function pwdDecryptFile(file, password, onP){
+  const a = new Uint8Array(await file.arrayBuffer());
+  const h = parseHead(a);
+  if(h.mode!==MODE_PWD) throw new Error('Ce fichier est chiffré par CLÉ RSA — utilise l’onglet « Clés RSA ».');
+  const salt = a.slice(h.off, h.off+16); let p = h.off+16;
+  const key = await deriveAesKey(password, salt, ['decrypt']);
+  let rel = h.rel, blob;
+  if(h.ver===VER1){ const iv=a.slice(p,p+12), ct=a.slice(p+12); blob = await oneShotDecrypt(key, iv, ct, 'Mot de passe incorrect ou fichier altéré.'); }
+  else if(h.ver===VER2){ blob = await decryptChunkedV2(a, p, key, a.length, onP); }
+  else if(h.ver===VER3){ const r = await readEncName(a, p, key); rel = r.rel; blob = await decryptChunkedV2(a, r.off, key, a.length, onP); }
+  else throw new Error('Version de conteneur non supportée : '+h.ver);
+  return { blob, name: base(rel) };
+}
+
+async function generateKeyPair(passphrase){
+  const kp = await crypto.subtle.generateKey(
+    { name:'RSA-OAEP', modulusLength:4096, publicExponent:new Uint8Array([1,0,1]), hash:'SHA-256' },
+    true, ['encrypt','decrypt']);
+  const pub = new Uint8Array(await crypto.subtle.exportKey('spki', kp.publicKey));
+  const pkcs8 = new Uint8Array(await crypto.subtle.exportKey('pkcs8', kp.privateKey));
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv   = crypto.getRandomValues(new Uint8Array(12));
+  const wrapKey = await deriveAesKey(passphrase, salt, ['encrypt']);
+  const encPriv = new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM', iv}, wrapKey, pkcs8));
+  return { pub, privFile: concat(salt, iv, encPriv) };
+}
+async function importPublicKey(spkiBytes){
+  return crypto.subtle.importKey('spki', spkiBytes, {name:'RSA-OAEP', hash:'SHA-256'}, false, ['encrypt']);
+}
+async function importPrivateKey(privFile, passphrase){
+  const salt = privFile.slice(0,16), iv = privFile.slice(16,28), enc = privFile.slice(28);
+  const wrapKey = await deriveAesKey(passphrase, salt, ['decrypt']);
+  let pkcs8;
+  try { pkcs8 = await crypto.subtle.decrypt({name:'AES-GCM', iv}, wrapKey, enc); }
+  catch { throw new Error('Passphrase incorrecte ou fichier de clé corrompu.'); }
+  return crypto.subtle.importKey('pkcs8', pkcs8, {name:'RSA-OAEP', hash:'SHA-256'}, false, ['decrypt']);
+}
+async function rsaEncryptFile(file, rel, pubKey, onP, hideName){
+  const sessionKey = await crypto.subtle.generateKey({name:'AES-GCM', length:256}, true, ['encrypt']);
+  const rawSession = new Uint8Array(await crypto.subtle.exportKey('raw', sessionKey));
+  const wrapped = new Uint8Array(await crypto.subtle.encrypt({name:'RSA-OAEP'}, pubKey, rawSession));
+  let header;
+  if(hideName){
+    header = concat(MAGIC, new Uint8Array([VER3, MODE_RSA]), u16(wrapped.length), wrapped, await encNameBlock(sessionKey, rel));
+  } else {
+    const name = te.encode(rel);
+    header = concat(MAGIC, new Uint8Array([VER2, MODE_RSA]), u16(name.length), name, u16(wrapped.length), wrapped);
+  }
+  return encryptChunked(file, sessionKey, header, onP);
+}
+async function rsaDecryptFile(file, privKey, onP){
+  const a = new Uint8Array(await file.arrayBuffer());
+  const h = parseHead(a);
+  if(h.mode!==MODE_RSA) throw new Error('Ce fichier est chiffré par MOT DE PASSE — utilise l’onglet « Mot de passe ».');
+  let p = h.off; const wlen = readU16(a, p); p += 2; const wrapped = a.slice(p, p+wlen); p += wlen;
+  let rawSession;
+  try { rawSession = await crypto.subtle.decrypt({name:'RSA-OAEP'}, privKey, wrapped); }
+  catch { throw new Error('Clé privée invalide pour ce fichier.'); }
+  const sessionKey = await crypto.subtle.importKey('raw', rawSession, {name:'AES-GCM'}, false, ['decrypt']);
+  let rel = h.rel, blob;
+  if(h.ver===VER1){ const iv=a.slice(p,p+12), ct=a.slice(p+12); blob = await oneShotDecrypt(sessionKey, iv, ct, 'Fichier altéré (échec d’intégrité GCM).'); }
+  else if(h.ver===VER2){ blob = await decryptChunkedV2(a, p, sessionKey, a.length, onP); }
+  else if(h.ver===VER3){ const r = await readEncName(a, p, sessionKey); rel = r.rel; blob = await decryptChunkedV2(a, r.off, sessionKey, a.length, onP); }
+  else throw new Error('Version de conteneur non supportée : '+h.ver);
+  return { blob, name: base(rel) };
+}
+
+const $ = id => document.getElementById(id);
+const sleep = ms => new Promise(r=>setTimeout(r, ms));
+function show(el, type, html){ el.className = 'msg '+type; el.innerHTML = html; }
+function showProgress(el, label, frac){
+  const pct = Math.round(Math.min(1, frac)*100);
+  el.className = 'msg ok';
+  el.innerHTML = `⏳ ${label} — ${pct}%<div class="bar"><i style="width:${pct}%"></i></div>`;
+}
+function fmtSize(n){
+  const u=['o','Ko','Mo','Go','To']; let i=0; while(n>=1024 && i<u.length-1){ n/=1024; i++; }
+  return (i?n.toFixed(1):n)+' '+u[i];
+}
+function download(data, name){
+  const blob = data instanceof Blob ? data : new Blob([data]);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = name; a.className='dl';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 8000);
+}
+
+['dragover','drop'].forEach(ev => document.addEventListener(ev, e => e.preventDefault()));
+
+async function readEntries(entries){
+  const out = [];
+  const walk = async (entry, path)=>{
+    if(!entry) return;
+    if(entry.isFile){
+      const f = await new Promise((res,rej)=>entry.file(res,rej));
+      out.push({ file:f, rel: path+entry.name });
+    } else if(entry.isDirectory){
+      const reader = entry.createReader();
+      let batch;
+      do { batch = await new Promise((res,rej)=>reader.readEntries(res,rej));
+           for(const e of batch) await walk(e, path+entry.name+'/'); }
+      while(batch.length);
+    }
+  };
+  for(const e of entries) await walk(e, '');
+  return out;
+}
+
+function wireDrop(dropId, inputId, onFiles){
+  const drop = $(dropId), input = $(inputId);
+  const initialText = drop.textContent;
+  drop._reset = ()=>{ drop.classList.remove('has'); drop.textContent = initialText; input.value = ''; };
+  drop.onclick = ()=> input.click();
+  input.onchange = ()=>{
+    const fs = [...input.files].map(f=>({file:f, rel:f.webkitRelativePath||f.name}));
+    if(fs.length) onFiles(fs, drop);
+  };
+  drop.ondragover  = e => { e.preventDefault(); e.stopPropagation(); drop.classList.add('over'); };
+  drop.ondragleave = ()=> drop.classList.remove('over');
+  drop.ondrop = async e => {
+    e.preventDefault(); e.stopPropagation(); drop.classList.remove('over');
+    const dt = e.dataTransfer;
+    const plainFiles = [...dt.files].map(f=>({file:f, rel:f.name}));
+    const entries = [];
+    if(dt.items && dt.items.length && dt.items[0].webkitGetAsEntry){
+      for(const it of dt.items){ const en = it.webkitGetAsEntry(); if(en) entries.push(en); }
+    }
+    const hasDir = entries.some(en => en.isDirectory);
+    let fs = plainFiles;
+    if(hasDir){
+      try { fs = await readEntries(entries); }
+      catch {
+        drop.classList.remove('has');
+        drop.textContent = '⚠️ Le dépôt d’un DOSSIER ne marche pas en ouvrant le fichier en local (file://). Dépose les fichiers directement, ou ouvre l’outil via http (ex. Laragon).';
+        return;
+      }
+    }
+    if(fs.length) onFiles(fs, drop);
+  };
+}
+function markFiles(drop, list){
+  drop.classList.add('has');
+  const total = list.reduce((s,x)=>s+x.file.size,0);
+  drop.textContent = list.length===1
+    ? '📄 '+list[0].rel+' ('+fmtSize(list[0].file.size)+')'
+    : '📄 '+list.length+' fichiers ('+fmtSize(total)+')';
+}
+
+function resetZone(drop){ if(drop && drop._reset) drop._reset(); }
+const encName = (rel, hide) => hide ? ('chiffre_'+Math.random().toString(36).slice(2,10)+'.enc') : base(rel)+'.enc';
+
+async function runBatch(list, msgEl, perFile, verb){
+  if(!list || !list.length){ show(msgEl,'err','❌ Choisis au moins un fichier.'); return false; }
+  const fails = [];
+  for(let k=0;k<list.length;k++){
+    const { file, rel } = list[k];
+    const label = `(${k+1}/${list.length}) ${base(rel)}`;
+    showProgress(msgEl, label, 0);
+    try {
+      const { blob, name } = await perFile(file, rel, frac=>showProgress(msgEl, label, frac));
+      download(blob, name);
+      if(list.length>1) await sleep(150);
+    } catch(e){ fails.push(base(rel)+' : '+e.message); }
+  }
+  if(fails.length){ show(msgEl,'err',`❌ ${fails.length} échec(s) sur ${list.length} :<br>`+fails.join('<br>')); return false; }
+  show(msgEl,'ok',`✅ ${list.length} fichier(s) ${verb} → téléchargé(s).`
+    + (verb==='chiffré(s)' ? '<br>↪️ Pense à supprimer le(s) original(aux) en clair : ils n’ont pas été modifiés.' : ''));
+  return true;
+}
+
+document.querySelectorAll('.tab').forEach(t => t.onclick = ()=>{
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('.tabpane').forEach(x=>x.classList.add('hidden'));
+  t.classList.add('active'); $(t.dataset.tab).classList.remove('hidden');
+});
+
+let pwdL=[], rsaEncL=[], rsaDecL=[];
+wireDrop('pwdDrop','pwdFile',(fs,d)=>{ pwdL=fs; markFiles(d,fs); });
+wireDrop('rsaEncDrop','rsaEncFile',(fs,d)=>{ rsaEncL=fs; markFiles(d,fs); });
+wireDrop('rsaDecDrop','rsaDecFile',(fs,d)=>{ rsaDecL=fs; markFiles(d,fs); });
+
+$('pwdEnc').onclick = async ()=>{
+  const pass = $('pwdPass').value;
+  if(!pass){ show($('pwdMsg'),'err','❌ Saisis un mot de passe.'); return; }
+  if(pass.length<16) show($('pwdMsg'),'ok','⚠️ Mot de passe court (< 16 car.) : sécurité affaiblie.');
+  const hide = $('pwdHideName').checked;
+  const ok = await runBatch(pwdL, $('pwdMsg'),
+    async (f,rel,onP)=>({ blob: await pwdEncryptFile(f, rel, pass, onP, hide), name: encName(rel, hide) }),
+    'chiffré(s)');
+  if(ok){ $('pwdPass').value=''; pwdL=[]; resetZone($('pwdDrop')); }
+};
+$('pwdDec').onclick = async ()=>{
+  const ok = await runBatch(pwdL, $('pwdMsg'),
+    (f,_rel,onP)=> pwdDecryptFile(f, $('pwdPass').value, onP),
+    'déchiffré(s)');
+  if(ok){ $('pwdPass').value=''; pwdL=[]; resetZone($('pwdDrop')); }
+};
+
+$('genBtn').onclick = async ()=>{
+  try{
+    const pass = $('genPass').value; if(pass.length<1) throw new Error('Saisis une passphrase pour la clé privée.');
+    show($('genMsg'),'ok','⏳ Génération RSA-4096 en cours (quelques secondes)…');
+    const { pub, privFile } = await generateKeyPair(pass);
+    download(pub, 'cle_publique.bin');
+    download(privFile, 'cle_privee.bin');
+    show($('genMsg'),'ok','✅ Clés générées : cle_publique.bin + cle_privee.bin téléchargées. Garde la clé privée hors du poste.');
+  }catch(e){ show($('genMsg'),'err','❌ '+e.message); }
+};
+$('rsaEncBtn').onclick = async ()=>{
+  const pk = $('pubKeyFile').files[0];
+  if(!pk){ show($('rsaEncMsg'),'err','❌ Choisis la clé publique (.bin).'); return; }
+  let pubKey;
+  try { pubKey = await importPublicKey(new Uint8Array(await pk.arrayBuffer())); }
+  catch { show($('rsaEncMsg'),'err','❌ Clé publique illisible.'); return; }
+  const hide = $('rsaHideName').checked;
+  const ok = await runBatch(rsaEncL, $('rsaEncMsg'),
+    async (f,rel,onP)=>({ blob: await rsaEncryptFile(f, rel, pubKey, onP, hide), name: encName(rel, hide) }),
+    'chiffré(s)');
+  if(ok){ rsaEncL=[]; resetZone($('rsaEncDrop')); }
+};
+$('rsaDecBtn').onclick = async ()=>{
+  const sk = $('privKeyFile').files[0];
+  if(!sk){ show($('rsaDecMsg'),'err','❌ Choisis la clé privée (.bin).'); return; }
+  let privKey;
+  try { privKey = await importPrivateKey(new Uint8Array(await sk.arrayBuffer()), $('rsaDecPass').value); }
+  catch(e){ show($('rsaDecMsg'),'err','❌ '+e.message); return; }
+  const ok = await runBatch(rsaDecL, $('rsaDecMsg'),
+    (f,_rel,onP)=> rsaDecryptFile(f, privKey, onP),
+    'déchiffré(s)');
+  if(ok){ $('rsaDecPass').value=''; rsaDecL=[]; resetZone($('rsaDecDrop')); }
+};
+</script>
+</body>
+</html>
