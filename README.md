@@ -93,11 +93,10 @@ dédié) et le `.enc` est téléchargé sous un nom générique (ex. `chiffre_a1
 Le vrai nom n'est plus lisible qu'après déchiffrement, où il est restauré à l'identique.
 
 
-Rapport avec le TP
 
 Ce projet est né du TP « Chiffrement de fichiers sensibles »,
-qui demande de protéger 4 fichiers selon 3 niveaux de sécurité (12 solutions), le niveau
-fort exigeant « chiffrement asymétrique ou combiné, algorithmes modernes (AES-256, RSA) ».
+qui demandait de protéger 4 fichiers selon 3 niveaux de sécurité (12 solutions), le niveau
+fort exigeait « chiffrement asymétrique ou combiné, algorithmes modernes (AES-256, RSA) ».
 Un immense merci a Mr BRIKCI-SID Boumediene pour l'inspiration et les ressources.
 
 Plutôt qu'un outil différent par fichier (VeraCrypt, GPG, stéganographie…), cet outil
@@ -107,7 +106,7 @@ les octets, donc agnostique au format), avec en prime un mode mot de passe pour 
 courants.
 
 
-Limites (par conception)
+Limites (conceptuelles)
 
 - Perdre le mot de passe ou la clé privée = données irrécupérables. Sauvegarder la clé
   privée hors du poste.
