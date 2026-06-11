@@ -10,6 +10,8 @@
   body { margin:0; font-family:system-ui,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--txt); line-height:1.5; }
   .wrap { max-width:760px; margin:0 auto; padding:24px 16px 64px; }
   h1 { font-size:1.5rem; margin:0 0 4px; }
+  .logo { font-family:ui-monospace,Consolas,monospace; color:var(--acc); font-size:.8rem; line-height:1.15; margin:0 0 8px; }
+  .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
   .sub { color:var(--mut); font-size:.9rem; margin-bottom:20px; }
   .tabs { display:flex; gap:8px; margin-bottom:16px; }
   .tab { flex:1; padding:10px; text-align:center; background:var(--card); border:1px solid #2b3744; border-radius:8px; cursor:pointer; color:var(--mut); }
@@ -45,19 +47,24 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>🔐 Chiffreur de fichiers</h1>
+  <h1 class="sr-only">Chiffreur de fichiers</h1>
+  <pre class="logo" aria-hidden="true"> .--.
+ / .. \
+| |  | |   CHIFFREUR
+| |__| |   de fichiers
+ '----'</pre>
   <div class="sub">AES-256-GCM · RSA-4096 · 100 % hors-ligne, dans ton navigateur. Aucun fichier n'est envoyé sur internet.</div>
 
   <div class="notice">
-    ⚠️ <b>Le chiffrement crée une copie <code>.enc</code> téléchargée</b> (dossier <i>Téléchargements</i>).
+    [!] <b>Le chiffrement crée une copie <code>.enc</code> téléchargée</b> (dossier <i>Téléchargements</i>).
     Un navigateur ne peut pas toucher tes fichiers : <b>l'original reste en clair, à sa place, non modifié</b>.
     Pour vraiment sécuriser un fichier, <b>supprime l'original toi-même</b> après avoir vérifié le <code>.enc</code>
     (et vide la corbeille ; idéalement effacement sécurisé type <code>cipher /w</code>).
   </div>
 
   <div class="tabs">
-    <div class="tab active" data-tab="pwd">🔑 Mot de passe</div>
-    <div class="tab" data-tab="rsa">🗝️ Clés RSA</div>
+    <div class="tab active" data-tab="pwd">Mot de passe</div>
+    <div class="tab" data-tab="rsa">Clés RSA</div>
   </div>
 
   <div id="pwd" class="tabpane">
@@ -314,7 +321,7 @@ function show(el, type, html){ el.className = 'msg '+type; el.innerHTML = html; 
 function showProgress(el, label, frac){
   const pct = Math.round(Math.min(1, frac)*100);
   el.className = 'msg ok';
-  el.innerHTML = `⏳ ${label} — ${pct}%<div class="bar"><i style="width:${pct}%"></i></div>`;
+  el.innerHTML = `[..] ${label} — ${pct}%<div class="bar"><i style="width:${pct}%"></i></div>`;
 }
 function fmtSize(n){
   const u=['o','Ko','Mo','Go','To']; let i=0; while(n>=1024 && i<u.length-1){ n/=1024; i++; }
@@ -374,7 +381,7 @@ function wireDrop(dropId, inputId, onFiles){
       try { fs = await readEntries(entries); }
       catch {
         drop.classList.remove('has');
-        drop.textContent = '⚠️ Le dépôt d’un DOSSIER ne marche pas en ouvrant le fichier en local (file://). Dépose les fichiers directement, ou ouvre l’outil via http (ex. Laragon).';
+        drop.textContent = '[!] Le dépôt d’un DOSSIER ne marche pas en ouvrant le fichier en local (file://). Dépose les fichiers directement, ou ouvre l’outil via http (ex. Laragon).';
         return;
       }
     }
@@ -385,15 +392,15 @@ function markFiles(drop, list){
   drop.classList.add('has');
   const total = list.reduce((s,x)=>s+x.file.size,0);
   drop.textContent = list.length===1
-    ? '📄 '+list[0].rel+' ('+fmtSize(list[0].file.size)+')'
-    : '📄 '+list.length+' fichiers ('+fmtSize(total)+')';
+    ? '[+] '+list[0].rel+' ('+fmtSize(list[0].file.size)+')'
+    : '[+] '+list.length+' fichiers ('+fmtSize(total)+')';
 }
 
 function resetZone(drop){ if(drop && drop._reset) drop._reset(); }
 const encName = (rel, hide) => hide ? ('chiffre_'+Math.random().toString(36).slice(2,10)+'.enc') : base(rel)+'.enc';
 
 async function runBatch(list, msgEl, perFile, verb){
-  if(!list || !list.length){ show(msgEl,'err','❌ Choisis au moins un fichier.'); return false; }
+  if(!list || !list.length){ show(msgEl,'err','[X] Choisis au moins un fichier.'); return false; }
   const fails = [];
   for(let k=0;k<list.length;k++){
     const { file, rel } = list[k];
@@ -405,9 +412,9 @@ async function runBatch(list, msgEl, perFile, verb){
       if(list.length>1) await sleep(150);
     } catch(e){ fails.push(base(rel)+' : '+e.message); }
   }
-  if(fails.length){ show(msgEl,'err',`❌ ${fails.length} échec(s) sur ${list.length} :<br>`+fails.join('<br>')); return false; }
-  show(msgEl,'ok',`✅ ${list.length} fichier(s) ${verb} → téléchargé(s).`
-    + (verb==='chiffré(s)' ? '<br>↪️ Pense à supprimer le(s) original(aux) en clair : ils n’ont pas été modifiés.' : ''));
+  if(fails.length){ show(msgEl,'err',`[X] ${fails.length} échec(s) sur ${list.length} :<br>`+fails.join('<br>')); return false; }
+  show(msgEl,'ok',`[OK] ${list.length} fichier(s) ${verb} → téléchargé(s).`
+    + (verb==='chiffré(s)' ? '<br>Pense à supprimer le(s) original(aux) en clair : ils n’ont pas été modifiés.' : ''));
   return true;
 }
 
@@ -424,8 +431,8 @@ wireDrop('rsaDecDrop','rsaDecFile',(fs,d)=>{ rsaDecL=fs; markFiles(d,fs); });
 
 $('pwdEnc').onclick = async ()=>{
   const pass = $('pwdPass').value;
-  if(!pass){ show($('pwdMsg'),'err','❌ Saisis un mot de passe.'); return; }
-  if(pass.length<16) show($('pwdMsg'),'ok','⚠️ Mot de passe court (< 16 car.) : sécurité affaiblie.');
+  if(!pass){ show($('pwdMsg'),'err','[X] Saisis un mot de passe.'); return; }
+  if(pass.length<16) show($('pwdMsg'),'ok','[!] Mot de passe court (< 16 car.) : sécurité affaiblie.');
   const hide = $('pwdHideName').checked;
   const ok = await runBatch(pwdL, $('pwdMsg'),
     async (f,rel,onP)=>({ blob: await pwdEncryptFile(f, rel, pass, onP, hide), name: encName(rel, hide) }),
@@ -442,19 +449,19 @@ $('pwdDec').onclick = async ()=>{
 $('genBtn').onclick = async ()=>{
   try{
     const pass = $('genPass').value; if(pass.length<1) throw new Error('Saisis une passphrase pour la clé privée.');
-    show($('genMsg'),'ok','⏳ Génération RSA-4096 en cours (quelques secondes)…');
+    show($('genMsg'),'ok','[..] Génération RSA-4096 en cours (quelques secondes)…');
     const { pub, privFile } = await generateKeyPair(pass);
     download(pub, 'cle_publique.bin');
     download(privFile, 'cle_privee.bin');
-    show($('genMsg'),'ok','✅ Clés générées : cle_publique.bin + cle_privee.bin téléchargées. Garde la clé privée hors du poste.');
-  }catch(e){ show($('genMsg'),'err','❌ '+e.message); }
+    show($('genMsg'),'ok','[OK] Clés générées : cle_publique.bin + cle_privee.bin téléchargées. Garde la clé privée hors du poste.');
+  }catch(e){ show($('genMsg'),'err','[X] '+e.message); }
 };
 $('rsaEncBtn').onclick = async ()=>{
   const pk = $('pubKeyFile').files[0];
-  if(!pk){ show($('rsaEncMsg'),'err','❌ Choisis la clé publique (.bin).'); return; }
+  if(!pk){ show($('rsaEncMsg'),'err','[X] Choisis la clé publique (.bin).'); return; }
   let pubKey;
   try { pubKey = await importPublicKey(new Uint8Array(await pk.arrayBuffer())); }
-  catch { show($('rsaEncMsg'),'err','❌ Clé publique illisible.'); return; }
+  catch { show($('rsaEncMsg'),'err','[X] Clé publique illisible.'); return; }
   const hide = $('rsaHideName').checked;
   const ok = await runBatch(rsaEncL, $('rsaEncMsg'),
     async (f,rel,onP)=>({ blob: await rsaEncryptFile(f, rel, pubKey, onP, hide), name: encName(rel, hide) }),
@@ -463,10 +470,10 @@ $('rsaEncBtn').onclick = async ()=>{
 };
 $('rsaDecBtn').onclick = async ()=>{
   const sk = $('privKeyFile').files[0];
-  if(!sk){ show($('rsaDecMsg'),'err','❌ Choisis la clé privée (.bin).'); return; }
+  if(!sk){ show($('rsaDecMsg'),'err','[X] Choisis la clé privée (.bin).'); return; }
   let privKey;
   try { privKey = await importPrivateKey(new Uint8Array(await sk.arrayBuffer()), $('rsaDecPass').value); }
-  catch(e){ show($('rsaDecMsg'),'err','❌ '+e.message); return; }
+  catch(e){ show($('rsaDecMsg'),'err','[X] '+e.message); return; }
   const ok = await runBatch(rsaDecL, $('rsaDecMsg'),
     (f,_rel,onP)=> rsaDecryptFile(f, privKey, onP),
     'déchiffré(s)');
