@@ -3,7 +3,7 @@ Chiffreur de fichiers
 Outil de chiffrement de fichiers universel, hors-ligne, en un seul fichier HTML.
 On l'ouvre dans n'importe quel navigateur — zéro installation, zéro serveur, zéro
 dépendance — et tout le chiffrement se fait localement dans la page. Aucun fichier
-ne quitte la machine.
+ne quitte la machine. 
 
 > Le seul fichier nécessaire est `chiffreur.html`. On peut le copier sur une clé
 > USB et l'utiliser partout (Windows / macOS / Linux / mobile).
@@ -15,16 +15,17 @@ Utilisation
 2. Choisir un mode (onglet) :
    - Mot de passe — simple. Un mot de passe pour chiffrer, le même pour déchiffrer.
    - Clés RSA — pour le partage. On chiffre avec la clé publique (diffusable),
-     on déchiffre avec la clé privée (secrète, protégée par une passphrase).
+     on déchiffre avec la clé privée (secrète, protégée par un mot de passe).
 3. Glisser un ou plusieurs fichiers (ou un dossier), saisir le secret, cliquer
    Chiffrer / Déchiffrer. Chaque fichier produit un `.enc` téléchargé.
 
 > Attention: Un navigateur ne peut pas modifier ni supprimer un fichier du disque. L'outil
-> crée une copie chiffrée (`.enc`) ; l'original reste en clair. Pour réellement
+> crée une copie chiffrée (`.enc`) ; l'original reste à sa place, en clair. Pour réellement
 > sécuriser un fichier, supprimer l'original soi-même après vérification (idéalement
 > par un effacement sécurisé, ex. `cipher /w` sous Windows).
 
 Glisser-déposer d'un dossier
+
 Le dépôt d'un dossier utilise l'API FileSystem entries, bloquée en `file://`
 (ouverture par double-clic). Pour cette fonction, servir la page via http, par ex.
 avec Laragon : `http://localhost/chiffreur-fichiers/secure/chiffreur.html`. Le dépôt
